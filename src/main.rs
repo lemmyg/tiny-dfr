@@ -1,5 +1,5 @@
 use std::{
-    fs::{File, OpenOptions},
+    fs::{File, OpenOptions, read_to_string},
     os::{
         fd::AsRawFd,
         unix::{io::OwnedFd, fs::OpenOptionsExt}
@@ -27,6 +27,7 @@ use input_linux::{uinput::UInputHandle, EventKind, Key, SynchronizeKind};
 use input_linux_sys::{uinput_setup, input_id, timeval, input_event};
 use nix::poll::{poll, PollFd, PollFlags};
 use privdrop::PrivDrop;
+use serde::Deserialize;
 
 mod backlight;
 mod display;
@@ -90,7 +91,7 @@ struct FunctionLayer {
 }
 
 impl FunctionLayer {
-    fn draw(&self, surface: &Surface, active_buttons: &[bool]) {
+    fn draw(&self, surface: &Surface, config: &Config, active_buttons: &[bool]) {
         let c = Context::new(&surface).unwrap();
         c.translate(DFR_HEIGHT as f64, 0.0);
         c.rotate((90.0f64).to_radians());
@@ -101,7 +102,7 @@ impl FunctionLayer {
         let top = (DFR_HEIGHT as f64) * 0.85;
         c.set_source_rgb(0.0, 0.0, 0.0);
         c.paint().unwrap();
-        c.select_font_face("sans-serif", FontSlant::Normal, FontWeight::Normal);
+        c.select_font_face(&config.ui.font, FontSlant::Normal, FontWeight::Normal);
         c.set_font_size(32.0);
         for (i, button) in self.buttons.iter().enumerate() {
             let left_edge = i as f64 * (button_width + spacing_width);
@@ -195,7 +196,35 @@ fn toggle_key<F>(uinput: &mut UInputHandle<F>, code: Key, value: i32) where F: A
     emit(uinput, EventKind::Synchronize, SynchronizeKind::Report as u16, 0);
 }
 
+#[repr(usize)]
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum LayerType {
+    Function,
+    Special,
+}
+
+#[derive(Deserialize)]
+struct UiConfig {
+    primary_layer: LayerType,
+    secondary_layer: LayerType,
+    font: String,
+}
+
+#[derive(Deserialize)]
+struct Config {
+    ui: UiConfig,
+}
+
+impl Config {
+    fn from_file(path: &str) -> Result<Self> {
+        toml::from_str(&read_to_string(path)?)
+            .map_err(anyhow::Error::from)
+    }
+}
+
 fn main() {
+    let config = Config::from_file("/etc/tiny-dfr.conf").unwrap();
     let mut uinput = UInputHandle::new(OpenOptions::new().write(true).open("/dev/uinput").unwrap());
     let mut backlight = BacklightManager::new();
 
@@ -210,7 +239,7 @@ fn main() {
         .unwrap_or_else(|e| { panic!("Failed to drop privileges: {}", e) });
 
     let mut surface = ImageSurface::create(Format::ARgb32, DFR_HEIGHT, DFR_WIDTH).unwrap();
-    let mut active_layer = 0;
+    let mut active_layer = config.ui.primary_layer as usize;
     let layers = [
         FunctionLayer {
             buttons: vec![
@@ -283,7 +312,7 @@ fn main() {
     loop {
         if needs_redraw {
             needs_redraw = false;
-            layers[active_layer].draw(&surface, &button_states[active_layer]);
+            layers[active_layer].draw(&surface, &config, &button_states[active_layer]);
             let data = surface.data().unwrap();
             drm.map().unwrap().as_mut()[..data.len()].copy_from_slice(&data);
             drm.dirty(&[ClipRect{x1: 0, y1: 0, x2: DFR_HEIGHT as u16, y2: DFR_WIDTH as u16}]).unwrap();
@@ -303,8 +332,8 @@ fn main() {
                 Event::Keyboard(KeyboardEvent::Key(key)) => {
                     if key.key() == Key::Fn as u32 {
                         let new_layer = match key.key_state() {
-                            KeyState::Pressed => 1,
-                            KeyState::Released => 0
+                            KeyState::Pressed => config.ui.secondary_layer as usize,
+                            KeyState::Released => config.ui.primary_layer as usize
                         };
                         if active_layer != new_layer {
                             active_layer = new_layer;
