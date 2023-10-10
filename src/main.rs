@@ -75,7 +75,18 @@ impl Button {
         loader.set_search_paths(search_paths);
         loader.set_theme_name_provider(icon_theme);
         loader.update_theme_name().unwrap();
-        let icon_loader = loader.load_icon(icon_name).unwrap();
+        let icon_loader = match loader.load_icon(icon_name) {
+            Some(loader) => loader,
+            None => {
+                // If loading the icon fails, use the icon_name as text
+                return Button {
+                    action,
+                    active: false,
+                    changed: false,
+                    image: ButtonImage::Text(icon_name),
+                };
+            }
+        };
         let icon = icon_loader.file_for_size(512);
         let image;
         match icon.icon_type() {
