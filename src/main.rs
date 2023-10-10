@@ -41,12 +41,14 @@ use display::DrmBackend;
 
 const BUTTON_COLOR_INACTIVE: f64 = 0.200;
 const BUTTON_COLOR_ACTIVE: f64 = 0.400;
+const BUTTON_COLOR_BLANK: f64 = 0.0;
 const TIMEOUT_MS: i32 = 30 * 1000;
 
 enum ButtonImage {
     Text(&'static str),
     Svg(SvgHandle),
     Png(DynamicImage),
+    Blank
 }
 
 struct Button {
@@ -108,6 +110,82 @@ impl Button {
             image,
         }
     }
+    fn new_app(icon_name: &'static str, action: Key) -> Button {
+        let icon_theme = Config::from_file("/etc/tiny-dfr.conf")
+            .unwrap()
+            .apps
+            .app_icon_theme;
+        let mut search_paths: Vec<PathBuf> = vec![
+            PathBuf::from("/usr/share/tiny-dfr/"),
+            PathBuf::from("/usr/share/icons/"),
+        ];
+        let mut loader = IconLoader::new();
+        search_paths.extend(loader.search_paths().into_owned());
+        loader.set_search_paths(search_paths);
+        loader.set_theme_name_provider(icon_theme);
+        loader.update_theme_name().unwrap();
+        let icon_loader = match loader.load_icon(icon_name) {
+            Some(loader) => loader,
+            None => {
+                // If loading the icon from the theme fails, try /usr/share/pixmaps
+
+                let icon_path_svg = Path::new("/usr/share/pixmaps").join(format!("{}.svg", icon_name));
+                let icon_path_png = Path::new("/usr/share/pixmaps").join(format!("{}.png", icon_name));
+
+
+                if icon_path_svg.exists() {
+                    return Button {
+                        action,
+                        active: false,
+                        changed: false,
+                        image: ButtonImage::Svg(Loader::new().read_path(icon_path_svg).unwrap()),
+                    };
+                } else if icon_path_png.exists() {
+                    return Button {
+                        action,
+                        active: false,
+                        changed: false,
+                        image: ButtonImage::Png(image::open(icon_path_png).unwrap()),
+                    };
+                } else {
+                    // If the icon is not found in /usr/share/pixmaps, use the icon_name as text
+                    return Button {
+                        action,
+                        active: false,
+                        changed: false,
+                        image: ButtonImage::Text(icon_name),
+                    };
+                }
+            }
+    };
+        let icon = icon_loader.file_for_size(512);
+        let image;
+        match icon.icon_type() {
+            IconFileType::SVG => {
+                image = ButtonImage::Svg(Loader::new().read_path(icon.path()).unwrap());
+            }
+            IconFileType::PNG => {
+                image = ButtonImage::Png(image::open(icon.path()).unwrap());
+            }
+            IconFileType::XPM => {
+                panic!("Legacy XPM icons are not supported")
+            }
+        }
+        Button {
+            action,
+            active: false,
+            changed: false,
+            image,
+        }
+    }
+    fn new_blank() -> Button {
+        Button {
+            action: Key::Unknown,
+            active: false,
+            changed: false,
+            image: ButtonImage::Blank,
+        }
+    }
     fn render(&self, c: &Context, height: f64, left_edge: f64, button_width: f64) {
         match &self.image {
             ButtonImage::Text(text) => {
@@ -117,7 +195,7 @@ impl Button {
                     height / 2.0 + extents.height() / 2.0,
                 );
                 c.show_text(text).unwrap();
-            }
+            },
             ButtonImage::Svg(svg) => {
                 let renderer = CairoRenderer::new(&svg);
                 let y = 0.10 * height;
@@ -126,7 +204,7 @@ impl Button {
                 renderer
                     .render_document(c, &Rectangle::new(x, y, size, size))
                     .unwrap();
-            }
+            },
             ButtonImage::Png(png) => {
                 let y = 0.10 * height;
                 let size = height - y * 2.0;
@@ -172,6 +250,8 @@ impl Button {
                 // Composite the PNG surface onto the main context (the `c` context)
                 let _ = c.set_source_surface(&png_surface, x, y);
                 let _ = c.paint().expect("Failed to composite PNG image");
+            },
+            _ => {
             }
         }
     }
@@ -233,9 +313,24 @@ impl FunctionLayer {
                 );
                 c.fill().unwrap();
             }
-            let color = if button.active {
+            let color = if (button.action == Key::Unknown ||
+                           button.action == Key::Macro1 ||
+                           button.action == Key::Macro2 ||
+                           button.action == Key::Macro3 ||
+                           button.action == Key::Macro4) ||
+                           ((button.action == Key::WWW ||
+                           button.action == Key::AllApplications ||
+                           button.action == Key::Calc ||
+                           button.action == Key::File ||
+                           button.action == Key::Prog1 ||
+                           button.action == Key::Prog2 ||
+                           button.action == Key::Prog3 ||
+                           button.action == Key::Prog4) &&
+                           !button.active) {
+                BUTTON_COLOR_BLANK
+            } else if button.active { 
                 BUTTON_COLOR_ACTIVE
-            } else {
+            } else { 
                 BUTTON_COLOR_INACTIVE
             };
             c.set_source_rgb(color, color, color);
@@ -364,6 +459,7 @@ where
 enum LayerType {
     Function,
     Special,
+    SpecialExtended,
 }
 
 #[derive(Deserialize)]
@@ -375,8 +471,18 @@ struct UiConfig {
 }
 
 #[derive(Deserialize)]
+struct AppConfig {
+    app_icon_theme: String,
+    app1_icon: String,
+    app2_icon: String,
+    app3_icon: String,
+    app4_icon: String,
+}
+
+#[derive(Deserialize)]
 struct Config {
     ui: UiConfig,
+    apps: AppConfig,
 }
 
 impl Config {
@@ -392,7 +498,20 @@ fn get_file_modified_time(path: &str) -> Option<SystemTime> {
         .flatten()
 }
 
-fn initialize_layers() -> [FunctionLayer; 2] {
+fn initialize_layers() -> [FunctionLayer; 5] {
+    let config_path = "/etc/tiny-dfr.conf";
+    let config = Config::from_file(config_path).unwrap();
+
+    let app1 = config.apps.app1_icon;
+    let app2 = config.apps.app2_icon;
+    let app3 = config.apps.app3_icon;
+    let app4 = config.apps.app4_icon;
+
+    let app1_str: &'static str = Box::leak(app1.into_boxed_str());
+    let app2_str: &'static str = Box::leak(app2.into_boxed_str());
+    let app3_str: &'static str = Box::leak(app3.into_boxed_str());
+    let app4_str: &'static str = Box::leak(app4.into_boxed_str());
+
     let primary_layer_buttons = vec![
         Button::new_text("esc", Key::Esc),
         Button::new_text("F1", Key::F1),
@@ -425,6 +544,54 @@ fn initialize_layers() -> [FunctionLayer; 2] {
         Button::new_icon("audio-volume-high-symbolic", Key::VolumeUp),
     ];
 
+    let tertiary_layer_buttons = vec![
+        Button::new_text("esc", Key::Esc),
+        Button::new_app(app1_str, Key::Prog1),
+        Button::new_app(app2_str, Key::Prog2),
+        Button::new_app(app3_str, Key::Prog3),
+        Button::new_app(app4_str, Key::Prog4),
+        Button::new_icon("go-next-symbolic", Key::Macro1),
+        Button::new_blank(),
+        Button::new_blank(),
+        Button::new_icon("audio-volume-low-symbolic", Key::VolumeDown),
+        Button::new_icon("audio-volume-high-symbolic", Key::VolumeUp),
+        Button::new_icon("media-playback-start-symbolic", Key::PlayPause),
+        Button::new_icon("system-search-symbolic", Key::Search),
+        Button::new_icon("go-next-symbolic", Key::Macro3),
+    ];
+
+    let tertiary2_layer_buttons = vec![
+        Button::new_text("esc", Key::Esc),
+        Button::new_icon("go-previous-symbolic", Key::Macro2),
+        Button::new_icon("web-browser-symbolic", Key::WWW),
+        Button::new_icon("accessories-calculator-symbolic", Key::Calc),
+        Button::new_icon("system-file-manager-symbolic", Key::File),
+        Button::new_icon("view-app-grid-symbolic", Key::AllApplications),
+        Button::new_blank(),
+        Button::new_blank(),
+        Button::new_icon("audio-volume-low-symbolic", Key::VolumeDown),
+        Button::new_icon("audio-volume-high-symbolic", Key::VolumeUp),
+        Button::new_icon("media-playback-start-symbolic", Key::PlayPause),
+        Button::new_icon("system-search-symbolic", Key::Search),
+        Button::new_icon("go-next-symbolic", Key::Macro3),
+    ];
+
+    let tertiary3_layer_buttons = vec![
+        Button::new_text("esc", Key::Esc),
+        Button::new_icon("go-previous-symbolic", Key::Macro4),
+        Button::new_icon("display-brightness-low-symbolic", Key::BrightnessDown),
+        Button::new_icon("display-brightness-high-symbolic", Key::BrightnessUp),
+        Button::new_icon("microphone-disabled-symbolic", Key::MicMute),
+        Button::new_icon("keyboard-brightness-low-symbolic", Key::IllumDown),
+        Button::new_icon("keyboard-brightness-high-symbolic", Key::IllumUp),
+        Button::new_icon("media-seek-backward-symbolic", Key::PreviousSong),
+        Button::new_icon("media-playback-start-symbolic", Key::PlayPause),
+        Button::new_icon("media-seek-forward-symbolic", Key::NextSong),
+        Button::new_icon("audio-volume-muted-symbolic", Key::Mute),
+        Button::new_icon("audio-volume-low-symbolic", Key::VolumeDown),
+        Button::new_icon("audio-volume-high-symbolic", Key::VolumeUp),
+    ];
+
     let primary_layer = FunctionLayer {
         buttons: primary_layer_buttons,
     };
@@ -433,7 +600,19 @@ fn initialize_layers() -> [FunctionLayer; 2] {
         buttons: secondary_layer_buttons,
     };
 
-    [primary_layer, secondary_layer]
+    let tertiary_layer = FunctionLayer {
+        buttons: tertiary_layer_buttons,
+    };
+
+    let tertiary2_layer = FunctionLayer {
+        buttons: tertiary2_layer_buttons,
+    };
+
+    let tertiary3_layer = FunctionLayer {
+        buttons: tertiary3_layer_buttons,
+    };
+
+    [primary_layer, secondary_layer, tertiary_layer, tertiary2_layer, tertiary3_layer]
 }
 
 fn main() {
@@ -568,6 +747,18 @@ fn main() {
                             active_layer = new_layer;
                             needs_complete_redraw = true;
                         }
+                        } else if key.key() == Key::Macro1 as u32 && key.key_state() == KeyState::Pressed {
+                            active_layer = 3;
+                            needs_complete_redraw = true;
+                        } else if key.key() == Key::Macro2 as u32 && key.key_state() == KeyState::Pressed {
+                            active_layer = 2;
+                            needs_complete_redraw = true;
+                        } else if key.key() == Key::Macro3 as u32 && key.key_state() == KeyState::Pressed {
+                            active_layer = 4;
+                            needs_complete_redraw = true;
+                        } else if key.key() == Key::Macro4 as u32 && key.key_state() == KeyState::Pressed {
+                            active_layer = 2;
+                            needs_complete_redraw = true;
                     }
                 }
                 Event::Touch(te) => {
