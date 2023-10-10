@@ -110,7 +110,7 @@ impl Button {
             image,
         }
     }
-    fn new_app(icon_name: &'static str, action: Key) -> Button {
+    fn new_app(icon_name: &'static str, action: Key, app_icon: &str) -> Button {
         let icon_theme = Config::from_file("/etc/tiny-dfr.conf")
             .unwrap()
             .apps
@@ -124,13 +124,13 @@ impl Button {
         loader.set_search_paths(search_paths);
         loader.set_theme_name_provider(icon_theme);
         loader.update_theme_name().unwrap();
-        let icon_loader = match loader.load_icon(icon_name) {
+        let icon_loader = match loader.load_icon(app_icon) {
             Some(loader) => loader,
             None => {
                 // If loading the icon from the theme fails, try /usr/share/pixmaps
 
-                let icon_path_svg = Path::new("/usr/share/pixmaps").join(format!("{}.svg", icon_name));
-                let icon_path_png = Path::new("/usr/share/pixmaps").join(format!("{}.png", icon_name));
+                let icon_path_svg = Path::new("/usr/share/pixmaps").join(format!("{}.svg", app_icon));
+                let icon_path_png = Path::new("/usr/share/pixmaps").join(format!("{}.png", app_icon));
 
 
                 if icon_path_svg.exists() {
@@ -502,16 +502,6 @@ fn initialize_layers() -> [FunctionLayer; 5] {
     let config_path = "/etc/tiny-dfr.conf";
     let config = Config::from_file(config_path).unwrap();
 
-    let app1 = config.apps.app1_icon;
-    let app2 = config.apps.app2_icon;
-    let app3 = config.apps.app3_icon;
-    let app4 = config.apps.app4_icon;
-
-    let app1_str: &'static str = Box::leak(app1.into_boxed_str());
-    let app2_str: &'static str = Box::leak(app2.into_boxed_str());
-    let app3_str: &'static str = Box::leak(app3.into_boxed_str());
-    let app4_str: &'static str = Box::leak(app4.into_boxed_str());
-
     let primary_layer_buttons = vec![
         Button::new_text("esc", Key::Esc),
         Button::new_text("F1", Key::F1),
@@ -546,10 +536,10 @@ fn initialize_layers() -> [FunctionLayer; 5] {
 
     let tertiary_layer_buttons = vec![
         Button::new_text("esc", Key::Esc),
-        Button::new_app(app1_str, Key::Prog1),
-        Button::new_app(app2_str, Key::Prog2),
-        Button::new_app(app3_str, Key::Prog3),
-        Button::new_app(app4_str, Key::Prog4),
+        Button::new_app("app1", Key::Prog1, &config.apps.app1_icon),
+        Button::new_app("app2", Key::Prog2, &config.apps.app2_icon),
+        Button::new_app("app3", Key::Prog3, &config.apps.app3_icon),
+        Button::new_app("app4", Key::Prog4, &config.apps.app4_icon),
         Button::new_icon("go-next-symbolic", Key::Macro1),
         Button::new_blank(),
         Button::new_blank(),
