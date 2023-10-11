@@ -67,54 +67,7 @@ impl Button {
             image: ButtonImage::Text(text),
         }
     }
-    fn new_icon(icon_name: &'static str, action: Key) -> Button {
-        let icon_theme = Config::from_file("/etc/tiny-dfr.conf")
-            .unwrap()
-            .ui
-            .icon_theme;
-        let mut search_paths: Vec<PathBuf> = vec![PathBuf::from("/usr/share/tiny-dfr/")];
-        let mut loader = IconLoader::new();
-        search_paths.extend(loader.search_paths().into_owned());
-        loader.set_search_paths(search_paths);
-        loader.set_theme_name_provider(icon_theme);
-        loader.update_theme_name().unwrap();
-        let icon_loader = match loader.load_icon(icon_name) {
-            Some(loader) => loader,
-            None => {
-                // If loading the icon fails, use the icon_name as text
-                return Button {
-                    action,
-                    active: false,
-                    changed: false,
-                    image: ButtonImage::Text(icon_name),
-                };
-            }
-        };
-        let icon = icon_loader.file_for_size(512);
-        let image;
-        match icon.icon_type() {
-            IconFileType::SVG => {
-                image = ButtonImage::Svg(Loader::new().read_path(icon.path()).unwrap());
-            }
-            IconFileType::PNG => {
-                image = ButtonImage::Png(image::open(icon.path()).unwrap());
-            }
-            IconFileType::XPM => {
-                panic!("Legacy XPM icons are not supported")
-            }
-        }
-        Button {
-            action,
-            active: false,
-            changed: false,
-            image,
-        }
-    }
-    fn new_app(icon_name: &'static str, action: Key, app_icon: &str) -> Button {
-        let icon_theme = Config::from_file("/etc/tiny-dfr.conf")
-            .unwrap()
-            .apps
-            .app_icon_theme;
+    fn new_icon(icon_name: &'static str, action: Key, app_icon: &str, icon_theme: &str) -> Button {
         let mut search_paths: Vec<PathBuf> = vec![
             PathBuf::from("/usr/share/tiny-dfr/"),
             PathBuf::from("/usr/share/icons/"),
@@ -124,8 +77,22 @@ impl Button {
         loader.set_search_paths(search_paths);
         loader.set_theme_name_provider(icon_theme);
         loader.update_theme_name().unwrap();
-        let icon_loader = match loader.load_icon(app_icon) {
-            Some(loader) => loader,
+        let image;
+        match loader.load_icon(app_icon) {
+            Some(icon_loader) => {
+                let icon = icon_loader.file_for_size(512);
+                match icon.icon_type() {
+                    IconFileType::SVG => {
+                        image = ButtonImage::Svg(Loader::new().read_path(icon.path()).unwrap());
+                    }
+                    IconFileType::PNG => {
+                        image = ButtonImage::Png(image::open(icon.path()).unwrap());
+                    }
+                    IconFileType::XPM => {
+                        panic!("Legacy XPM icons are not supported")
+                    }
+                }
+            }       
             None => {
                 // If loading the icon from the theme fails, try /usr/share/pixmaps
 
@@ -134,43 +101,15 @@ impl Button {
 
 
                 if icon_path_svg.exists() {
-                    return Button {
-                        action,
-                        active: false,
-                        changed: false,
-                        image: ButtonImage::Svg(Loader::new().read_path(icon_path_svg).unwrap()),
-                    };
+                        image = ButtonImage::Svg(Loader::new().read_path(icon_path_svg).unwrap());
                 } else if icon_path_png.exists() {
-                    return Button {
-                        action,
-                        active: false,
-                        changed: false,
-                        image: ButtonImage::Png(image::open(icon_path_png).unwrap()),
-                    };
+                        image = ButtonImage::Png(image::open(icon_path_png).unwrap());
                 } else {
                     // If the icon is not found in /usr/share/pixmaps, use the icon_name as text
-                    return Button {
-                        action,
-                        active: false,
-                        changed: false,
-                        image: ButtonImage::Text(icon_name),
-                    };
+                        image = ButtonImage::Text(icon_name);
                 }
             }
-    };
-        let icon = icon_loader.file_for_size(512);
-        let image;
-        match icon.icon_type() {
-            IconFileType::SVG => {
-                image = ButtonImage::Svg(Loader::new().read_path(icon.path()).unwrap());
-            }
-            IconFileType::PNG => {
-                image = ButtonImage::Png(image::open(icon.path()).unwrap());
-            }
-            IconFileType::XPM => {
-                panic!("Legacy XPM icons are not supported")
-            }
-        }
+        };
         Button {
             action,
             active: false,
@@ -520,66 +459,66 @@ fn initialize_layers() -> [FunctionLayer; 5] {
 
     let secondary_layer_buttons = vec![
         Button::new_text("esc", Key::Esc),
-        Button::new_icon("display-brightness-low-symbolic", Key::BrightnessDown),
-        Button::new_icon("display-brightness-high-symbolic", Key::BrightnessUp),
-        Button::new_icon("microphone-disabled-symbolic", Key::MicMute),
-        Button::new_icon("system-search-symbolic", Key::Search),
-        Button::new_icon("keyboard-brightness-low-symbolic", Key::IllumDown),
-        Button::new_icon("keyboard-brightness-high-symbolic", Key::IllumUp),
-        Button::new_icon("media-seek-backward-symbolic", Key::PreviousSong),
-        Button::new_icon("media-playback-start-symbolic", Key::PlayPause),
-        Button::new_icon("media-seek-forward-symbolic", Key::NextSong),
-        Button::new_icon("audio-volume-muted-symbolic", Key::Mute),
-        Button::new_icon("audio-volume-low-symbolic", Key::VolumeDown),
-        Button::new_icon("audio-volume-high-symbolic", Key::VolumeUp),
+        Button::new_icon("Brightness_low", Key::BrightnessDown, "display-brightness-low-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Brightness_high", Key::BrightnessUp, "display-brightness-high-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Mic_mute", Key::MicMute, "microphone-disabled-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Search", Key::Search, "system-search-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Keyboard_brightness_low", Key::IllumDown, "keyboard-brightness-low-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Keyboard_brightness_high", Key::IllumUp, "keyboard-brightness-high-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Previous_song", Key::PreviousSong, "media-seek-backward-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Play/Pause", Key::PlayPause, "media-playback-start-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Next_song", Key::NextSong, "media-seek-forward-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Mute", Key::Mute, "audio-volume-muted-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Decrease_volume", Key::VolumeDown, "audio-volume-low-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Increase_volume", Key::VolumeUp, "audio-volume-high-symbolic", &config.ui.icon_theme),
     ];
 
     let tertiary_layer_buttons = vec![
         Button::new_text("esc", Key::Esc),
-        Button::new_app("app1", Key::Prog1, &config.apps.app1_icon),
-        Button::new_app("app2", Key::Prog2, &config.apps.app2_icon),
-        Button::new_app("app3", Key::Prog3, &config.apps.app3_icon),
-        Button::new_app("app4", Key::Prog4, &config.apps.app4_icon),
-        Button::new_icon("go-next-symbolic", Key::Macro1),
+        Button::new_icon("app1", Key::Prog1, &config.apps.app1_icon, &config.apps.app_icon_theme),
+        Button::new_icon("app2", Key::Prog2, &config.apps.app2_icon, &config.apps.app_icon_theme),
+        Button::new_icon("app3", Key::Prog3, &config.apps.app3_icon, &config.apps.app_icon_theme),
+        Button::new_icon("app4", Key::Prog4, &config.apps.app4_icon, &config.apps.app_icon_theme),
+        Button::new_icon("Show_utility_apps", Key::Macro1, "go-next-symbolic", &config.ui.icon_theme),
         Button::new_blank(),
         Button::new_blank(),
-        Button::new_icon("audio-volume-low-symbolic", Key::VolumeDown),
-        Button::new_icon("audio-volume-high-symbolic", Key::VolumeUp),
-        Button::new_icon("media-playback-start-symbolic", Key::PlayPause),
-        Button::new_icon("system-search-symbolic", Key::Search),
-        Button::new_icon("go-next-symbolic", Key::Macro3),
+        Button::new_icon("Decrease_volume", Key::VolumeDown, "audio-volume-low-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Increase_volume", Key::VolumeUp, "audio-volume-high-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Play/Pause", Key::PlayPause, "media-playback-start-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Search", Key::Search, "system-search-symbolic", &config.ui.icon_theme),
+        Button::new_icon("All_media_controls", Key::Macro3, "go-next-symbolic", &config.ui.icon_theme),
     ];
 
     let tertiary2_layer_buttons = vec![
         Button::new_text("esc", Key::Esc),
-        Button::new_icon("go-previous-symbolic", Key::Macro2),
-        Button::new_icon("web-browser-symbolic", Key::WWW),
-        Button::new_icon("accessories-calculator-symbolic", Key::Calc),
-        Button::new_icon("system-file-manager-symbolic", Key::File),
-        Button::new_icon("view-app-grid-symbolic", Key::AllApplications),
+        Button::new_icon("Show_custom_apps", Key::Macro2, "go-previous-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Web_browser", Key::WWW, "web-browser-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Calculator", Key::Calc, "accessories-calculator-symbolic", &config.ui.icon_theme),
+        Button::new_icon("File_browser", Key::File, "system-file-manager-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Apps", Key::AllApplications, "view-app-grid-symbolic", &config.ui.icon_theme),
         Button::new_blank(),
         Button::new_blank(),
-        Button::new_icon("audio-volume-low-symbolic", Key::VolumeDown),
-        Button::new_icon("audio-volume-high-symbolic", Key::VolumeUp),
-        Button::new_icon("media-playback-start-symbolic", Key::PlayPause),
-        Button::new_icon("system-search-symbolic", Key::Search),
-        Button::new_icon("go-next-symbolic", Key::Macro3),
+        Button::new_icon("Decrease_volume", Key::VolumeDown, "audio-volume-low-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Increase_volume", Key::VolumeUp, "audio-volume-high-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Play/Pause", Key::PlayPause, "media-playback-start-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Search", Key::Search, "system-search-symbolic", &config.ui.icon_theme),
+        Button::new_icon("All_media_controls", Key::Macro3, "go-next-symbolic", &config.ui.icon_theme),
     ];
 
     let tertiary3_layer_buttons = vec![
         Button::new_text("esc", Key::Esc),
-        Button::new_icon("go-previous-symbolic", Key::Macro4),
-        Button::new_icon("display-brightness-low-symbolic", Key::BrightnessDown),
-        Button::new_icon("display-brightness-high-symbolic", Key::BrightnessUp),
-        Button::new_icon("microphone-disabled-symbolic", Key::MicMute),
-        Button::new_icon("keyboard-brightness-low-symbolic", Key::IllumDown),
-        Button::new_icon("keyboard-brightness-high-symbolic", Key::IllumUp),
-        Button::new_icon("media-seek-backward-symbolic", Key::PreviousSong),
-        Button::new_icon("media-playback-start-symbolic", Key::PlayPause),
-        Button::new_icon("media-seek-forward-symbolic", Key::NextSong),
-        Button::new_icon("audio-volume-muted-symbolic", Key::Mute),
-        Button::new_icon("audio-volume-low-symbolic", Key::VolumeDown),
-        Button::new_icon("audio-volume-high-symbolic", Key::VolumeUp),
+        Button::new_icon("Show_custom_apps", Key::Macro2, "go-previous-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Brightness_low", Key::BrightnessDown, "display-brightness-low-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Brightness_high", Key::BrightnessUp, "display-brightness-high-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Mic_mute", Key::MicMute, "microphone-disabled-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Keyboard_brightness_low", Key::IllumDown, "keyboard-brightness-low-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Keyboard_brightness_high", Key::IllumUp, "keyboard-brightness-high-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Previous_Song", Key::PreviousSong, "media-seek-backward-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Play/Pause", Key::PlayPause, "media-playback-start-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Next_Song", Key::NextSong, "media-seek-forward-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Mute", Key::Mute, "audio-volume-muted-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Decrease_volume", Key::VolumeDown, "audio-volume-low-symbolic", &config.ui.icon_theme),
+        Button::new_icon("Increase_volume", Key::VolumeUp, "audio-volume-high-symbolic", &config.ui.icon_theme),
     ];
 
     let primary_layer = FunctionLayer {
@@ -745,9 +684,6 @@ fn main() {
                             needs_complete_redraw = true;
                         } else if key.key() == Key::Macro3 as u32 && key.key_state() == KeyState::Pressed {
                             active_layer = 4;
-                            needs_complete_redraw = true;
-                        } else if key.key() == Key::Macro4 as u32 && key.key_state() == KeyState::Pressed {
-                            active_layer = 2;
                             needs_complete_redraw = true;
                     }
                 }
