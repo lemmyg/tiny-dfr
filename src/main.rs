@@ -1,5 +1,6 @@
 use anyhow::Result;
 use cairo::{Context, FontSlant, FontWeight, Format, ImageSurface, Rectangle};
+use chrono::Local;
 use drm::control::ClipRect;
 use icon_loader::{IconFileType, IconLoader};
 use image::{
@@ -46,6 +47,8 @@ const TIMEOUT_MS: i32 = 30 * 1000;
 
 enum ButtonImage {
     Text(&'static str),
+    Time(&'static str),
+    Date(&'static str),
     Svg(SvgHandle),
     Png(DynamicImage),
     Blank
@@ -65,6 +68,22 @@ impl Button {
             active: false,
             changed: false,
             image: ButtonImage::Text(text),
+        }
+    }
+    fn new_time(text: &'static str, action: Key) -> Button {
+        Button {
+            action,
+            active: false,
+            changed: false,
+            image: ButtonImage::Time(text),
+        }
+    }
+    fn new_date(text: &'static str, action: Key) -> Button {
+        Button {
+            action,
+            active: false,
+            changed: false,
+            image: ButtonImage::Date(text),
         }
     }
     fn new_icon(icon_name: &'static str, action: Key, app_icon: &str, icon_theme: &str) -> Button {
@@ -134,6 +153,38 @@ impl Button {
                     height / 2.0 + extents.height() / 2.0,
                 );
                 c.show_text(text).unwrap();
+            },
+            ButtonImage::Time(_) => {
+                let current_time = Local::now();
+            
+                // Format the time as a string (you can customize the format)
+                let formatted_time = current_time.format("%l:%M %p").to_string();
+
+                // Calculate the text extents for the formatted time
+                let time_extents = c.text_extents(&formatted_time).unwrap();
+
+                // Display the formatted time
+                c.move_to(
+                    left_edge + button_width / 2.0 - time_extents.width() / 2.0,
+                    height / 2.0 + time_extents.height() / 2.0,
+                );
+                c.show_text(&formatted_time).unwrap();
+            },
+            ButtonImage::Date(_) => {
+                let current_date = Local::now();
+            
+                // Format the date as a string (you can customize the format)
+                let formatted_date = current_date.format("%a %e %b").to_string();
+
+                // Calculate the text extents for the formatted date
+                let date_extents = c.text_extents(&formatted_date).unwrap();
+
+                // Display the formatted date
+                c.move_to(
+                    left_edge + button_width / 2.0 - date_extents.width() / 2.0,
+                    height / 2.0 + date_extents.height() / 2.0,
+                );
+                c.show_text(&formatted_date).unwrap();
             },
             ButtonImage::Svg(svg) => {
                 let renderer = CairoRenderer::new(&svg);
@@ -235,8 +286,12 @@ impl FunctionLayer {
             c.paint().unwrap();
         }
         c.select_font_face(&config.ui.font, FontSlant::Normal, FontWeight::Normal);
-        c.set_font_size(32.0);
         for (i, button) in self.buttons.iter_mut().enumerate() {
+            if button.action == Key::Time {
+                c.set_font_size(28.0);
+            } else {
+                c.set_font_size(32.0);
+            }
             if !button.changed && !complete_redraw {
                 continue;
             };
@@ -256,7 +311,8 @@ impl FunctionLayer {
                            button.action == Key::Macro1 ||
                            button.action == Key::Macro2 ||
                            button.action == Key::Macro3 ||
-                           button.action == Key::Macro4) ||
+                           button.action == Key::Macro4 ||
+                           button.action == Key::Time) ||
                            ((button.action == Key::WWW ||
                            button.action == Key::AllApplications ||
                            button.action == Key::Calc ||
@@ -480,7 +536,8 @@ fn initialize_layers() -> [FunctionLayer; 5] {
         Button::new_icon("app3", Key::Prog3, &config.apps.app3_icon, &config.apps.app_icon_theme),
         Button::new_icon("app4", Key::Prog4, &config.apps.app4_icon, &config.apps.app_icon_theme),
         Button::new_icon("Show_utility_apps", Key::Macro1, "go-next-symbolic", &config.ui.icon_theme),
-        Button::new_blank(),
+        Button::new_time("Time", Key::Time),
+        Button::new_date("Date", Key::Time),
         Button::new_blank(),
         Button::new_icon("Decrease_volume", Key::VolumeDown, "audio-volume-low-symbolic", &config.ui.icon_theme),
         Button::new_icon("Increase_volume", Key::VolumeUp, "audio-volume-high-symbolic", &config.ui.icon_theme),
@@ -496,7 +553,8 @@ fn initialize_layers() -> [FunctionLayer; 5] {
         Button::new_icon("Calculator", Key::Calc, "accessories-calculator-symbolic", &config.ui.icon_theme),
         Button::new_icon("File_browser", Key::File, "system-file-manager-symbolic", &config.ui.icon_theme),
         Button::new_icon("Apps", Key::AllApplications, "view-app-grid-symbolic", &config.ui.icon_theme),
-        Button::new_blank(),
+        Button::new_time("Time", Key::Time),
+        Button::new_date("Date", Key::Time),
         Button::new_blank(),
         Button::new_icon("Decrease_volume", Key::VolumeDown, "audio-volume-low-symbolic", &config.ui.icon_theme),
         Button::new_icon("Increase_volume", Key::VolumeUp, "audio-volume-high-symbolic", &config.ui.icon_theme),
@@ -631,6 +689,15 @@ fn main() {
                 Err(e) => {
                     eprintln!("Failed to reload configuration: {}", e);
                 }
+            }
+        }
+        if active_layer == 2 || active_layer == 3 {
+            if width < 2170 {
+                layers[active_layer].buttons[5].changed = true;
+                layers[active_layer].buttons[6].changed = true;
+            } else {
+                layers[active_layer].buttons[6].changed = true;
+                layers[active_layer].buttons[7].changed = true;
             }
         }
         if needs_complete_redraw || layers[active_layer].buttons.iter().any(|b| b.changed) {
