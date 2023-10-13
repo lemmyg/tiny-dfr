@@ -48,7 +48,7 @@ enum ButtonImage {
     Text(&'static str),
     Svg(SvgHandle),
     Png(DynamicImage),
-    Time,
+    Time(u16),
     Blank,
 }
 
@@ -118,12 +118,12 @@ impl Button {
             image,
         }
     }
-    fn new_time() -> Button {
+    fn new_time(use_24_hour: u16) -> Button {
         Button {
             action: Key::Time,
             active: false,
             changed: false,
-            image: ButtonImage::Time,
+            image: ButtonImage::Time(use_24_hour),
         }
     }
     fn new_blank() -> Button {
@@ -199,23 +199,36 @@ impl Button {
                 let _ = c.set_source_surface(&png_surface, x, y);
                 let _ = c.paint().expect("Failed to composite PNG image");
             },
-            ButtonImage::Time => {
+            ButtonImage::Time(use_24_hour) => {
                 let current_time = Local::now();
             
                 // Format the time as a string
                 let day_of_month = current_time.format("%e").to_string();
                 let day_of_month = day_of_month.trim_start(); // Remove leading space if present
-
-                let formatted_time = format!(
-                    "{}:{} {}    {} {} {}",
-                    current_time.format("%l"),
-                    current_time.format("%M"),
-                    current_time.format("%p"),
-                    current_time.format("%a"),
-                    day_of_month,
-                    current_time.format("%b")
-                );
-
+                let formatted_time; 
+                match use_24_hour {
+                    0 => {
+                        formatted_time = format!(
+                        "{}:{} {}    {} {} {}",
+                        current_time.format("%l"),
+                        current_time.format("%M"),
+                        current_time.format("%p"),
+                        current_time.format("%a"),
+                        day_of_month,
+                        current_time.format("%b")
+                        );
+                    }
+                    _ => {
+                        formatted_time = format!(
+                        "{}:{}    {} {} {}",
+                        current_time.format("%H"),
+                        current_time.format("%M"),
+                        current_time.format("%a"),
+                        day_of_month,
+                        current_time.format("%b")
+                        );
+                    }
+                }
                 // Calculate the text extents for the formatted time
                 let time_extents = c.text_extents(&formatted_time).unwrap();
 
@@ -478,9 +491,15 @@ struct AppConfig {
 }
 
 #[derive(Deserialize)]
+struct TimeConfig {
+    use_24_hr: u16,
+}
+
+#[derive(Deserialize)]
 struct Config {
     ui: UiConfig,
     apps: AppConfig,
+    time: TimeConfig,
 }
 
 impl Config {
@@ -539,7 +558,7 @@ fn initialize_layers() -> [FunctionLayer; 5] {
         Button::new_icon("app3", Key::Prog3, &config.apps.app3_icon, &config.apps.app_icon_theme),
         Button::new_icon("app4", Key::Prog4, &config.apps.app4_icon, &config.apps.app_icon_theme),
         Button::new_icon("Show_utility_apps", Key::Macro1, "go-next-symbolic", &config.ui.icon_theme),
-        Button::new_time(),
+        Button::new_time(config.time.use_24_hr),
         Button::new_blank(),
         Button::new_blank(),
         Button::new_icon("Decrease_volume", Key::VolumeDown, "audio-volume-low-symbolic", &config.ui.icon_theme),
@@ -556,7 +575,7 @@ fn initialize_layers() -> [FunctionLayer; 5] {
         Button::new_icon("Calculator", Key::Calc, "accessories-calculator-symbolic", &config.ui.icon_theme),
         Button::new_icon("File_browser", Key::File, "system-file-manager-symbolic", &config.ui.icon_theme),
         Button::new_icon("Apps", Key::AllApplications, "view-app-grid-symbolic", &config.ui.icon_theme),
-        Button::new_time(),
+        Button::new_time(config.time.use_24_hr),
         Button::new_blank(),
         Button::new_blank(),
         Button::new_icon("Decrease_volume", Key::VolumeDown, "audio-volume-low-symbolic", &config.ui.icon_theme),
