@@ -42,7 +42,6 @@ use display::DrmBackend;
 
 const BUTTON_COLOR_INACTIVE: f64 = 0.200;
 const BUTTON_COLOR_ACTIVE: f64 = 0.400;
-const BUTTON_COLOR_BLANK: f64 = 0.0;
 const TIMEOUT_MS: i32 = 30 * 1000;
 
 enum ButtonImage {
@@ -298,28 +297,27 @@ impl FunctionLayer {
                 }
                 c.fill().unwrap();
             }
-            let color = if (button.action == Key::WWW ||
-                           button.action == Key::AllApplications ||
-                           button.action == Key::Calc ||
-                           button.action == Key::File ||
-                           button.action == Key::Prog1 ||
-                           button.action == Key::Prog2 ||
-                           button.action == Key::Prog3 ||
-                           button.action == Key::Prog4) &&
-                           !button.active {
-                BUTTON_COLOR_BLANK
-            } else if button.active { 
+            let color = if button.active { 
                 BUTTON_COLOR_ACTIVE
             } else { 
                 BUTTON_COLOR_INACTIVE
             };
 
-            if button.action != Key::Time &&
+            if (button.action != Key::Time &&
                button.action != Key::Unknown &&
                button.action != Key::Macro1 &&
                button.action != Key::Macro2 &&
                button.action != Key::Macro3 &&
-               button.action != Key::Macro4 {
+               button.action != Key::Macro4) &&
+               ((button.action != Key::WWW &&
+                button.action != Key::AllApplications &&
+                button.action != Key::Calc &&
+                button.action != Key::File &&
+                button.action != Key::Prog1 &&
+                button.action != Key::Prog2 &&
+                button.action != Key::Prog3 &&
+                button.action != Key::Prog4) ||
+                button.active) {
                 // draw box with rounded corners
                 c.set_source_rgb(color, color, color);
                 c.new_sub_path();
