@@ -205,12 +205,14 @@ impl Button {
                 // Format the time as a string
                 let day_of_month = current_time.format("%e").to_string();
                 let day_of_month = day_of_month.trim_start(); // Remove leading space if present
+                let twelve_hour = current_time.format("%l").to_string();
+                let twelve_hour = twelve_hour.trim_start(); // Remove leading space if present
                 let formatted_time; 
                 match use_24_hour {
                     0 => {
                         formatted_time = format!(
                         "{}:{} {}    {} {} {}",
-                        current_time.format("%l"),
+                        twelve_hour,
                         current_time.format("%M"),
                         current_time.format("%p"),
                         current_time.format("%a"),
