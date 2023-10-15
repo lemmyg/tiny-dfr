@@ -70,7 +70,7 @@ impl Button {
     }
     fn new_icon(icon_name: &'static str, action: Key, app_icon: &str, icon_theme: &str) -> Button {
         let mut search_paths: Vec<PathBuf> = vec![
-            PathBuf::from("/usr/share/tiny-dfr/"),
+            PathBuf::from("/usr/share/tiny-dfr/icons/"),
             PathBuf::from("/usr/share/icons/"),
         ];
         let mut loader = IconLoader::new();
