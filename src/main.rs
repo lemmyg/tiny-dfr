@@ -221,7 +221,7 @@ impl Button {
                         current_time.format("%b")
                         );
                     }
-                    _ => {
+                    1 => {
                         formatted_time = format!(
                         "{}:{}    {} {} {}",
                         current_time.format("%H"),
@@ -230,6 +230,9 @@ impl Button {
                         day_of_month,
                         current_time.format("%b")
                         );
+                    }
+                    _ => {
+                        formatted_time = "".to_string();
                     }
                 }
                 // Calculate the text extents for the formatted time
