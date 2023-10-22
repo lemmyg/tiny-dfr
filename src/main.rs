@@ -23,6 +23,7 @@ use nix::poll::{poll, PollFd, PollFlags};
 use privdrop::PrivDrop;
 use rsvg::{CairoRenderer, Loader, SvgHandle};
 use serde::Deserialize;
+use lazy_static::lazy_static;
 use std::{
     collections::HashMap,
     fs::{read_to_string, self, File, OpenOptions},
@@ -470,6 +471,23 @@ where
     );
 }
 
+#[derive(Deserialize)]
+struct ButtonConfig {
+    label: String,
+    key: String,
+}
+
+#[derive(Deserialize)]
+struct PrimaryLayerButtonsConfig {
+    buttons: Vec<ButtonConfig>,
+}
+
+#[derive(Deserialize)]
+struct LayersConfig {
+    primary_layer_buttons: PrimaryLayerButtonsConfig,
+}
+
+
 #[repr(usize)]
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -506,6 +524,7 @@ struct Config {
     ui: UiConfig,
     apps: AppConfig,
     time: TimeConfig,
+    layers: LayersConfig,
 }
 
 impl Config {
@@ -521,10 +540,46 @@ fn get_file_modified_time(path: &str) -> Option<SystemTime> {
         .flatten()
 }
 
+
+
+
+
+
+
+
 fn initialize_layers() -> [FunctionLayer; 5] {
     let config_path = "/etc/tiny-dfr.conf";
     let config = Config::from_file(config_path).unwrap();
-
+    
+    let key_map = HashMap::from([
+        ("Esc", Key::Esc),
+        ("F1", Key::F1),
+        ("F2", Key::F2),
+        ("F3", Key::F3),
+        ("F4", Key::F4),
+        ("F5", Key::F5),
+        ("F6", Key::F6),
+        ("F7", Key::F7),
+        ("F8", Key::F8),
+        ("F9", Key::F9),
+        ("F10", Key::F10),
+        ("F11", Key::F11),
+        ("F12", Key::F12),
+    ]);
+    
+    let mut primary_layer_buttons = Vec::new();
+    for button_config in &config.layers.primary_layer_buttons.buttons {
+        let label: &'static str = button_config.label.as_str();
+        //let label = &button_config.label.as_str();
+        let key = &button_config.key.as_str();
+        match key_map.get(key) {
+            Some(value) => {
+                primary_layer_buttons.push(Button::new_text(label, *value));
+                println!("Found key {}: with value {:?}", label, value );
+            }
+            None => println!("Could not find {key} in the map.")
+        }
+    }
     let primary_layer_buttons = vec![
         Button::new_text("esc", Key::Esc),
         Button::new_text("F1", Key::F1),
@@ -642,7 +697,7 @@ fn main() {
 
     PrivDrop::default()
         .user("nobody")
-        .group("nobody")
+        .group("nogroup")
         .group_list(&groups)
         .apply()
         .unwrap_or_else(|e| panic!("Failed to drop privileges: {}", e));
