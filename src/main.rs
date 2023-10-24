@@ -44,7 +44,6 @@ use display::DrmBackend;
 const BUTTON_COLOR_INACTIVE: f64 = 0.200;
 const BUTTON_COLOR_ACTIVE: f64 = 0.400;
 const TIMEOUT_MS: i32 = 30 * 1000;
-//const CONFIG_PATH: &str = "/home/galder/git/tiny-dfr/etc/tiny-dfr.conf";
 const CONFIG_PATH: &str = "/etc/tiny-dfr.conf";
 
 enum ButtonImage {
@@ -475,7 +474,9 @@ where
 
 #[derive(Deserialize)]
 struct ButtonConfig {
+    #[serde(default)]
     label: String,
+    #[serde(default)]
     key: String,
     mode: String,
     #[serde(default)]
@@ -510,6 +511,7 @@ struct UiConfig {
     primary_layer: LayerType,
     secondary_layer: LayerType,
     font: String,
+    icon_theme: String,
 }
 
 
@@ -557,29 +559,27 @@ fn build_layer_vectors(buttons: &Vec<ButtonConfig>, config: &Config) -> Vec<Butt
     // helper to poputate layers with the given config
     let mut vector = Vec::new();
     for button_config in buttons {
-        let label = &button_config.label.as_str();
-        let key = &button_config.key;
-        let theme = &button_config.theme;
+        let label = button_config.label.as_str();
+        let key = button_config.key.as_str();
+        let theme = button_config.theme.as_str();
         let mode = button_config.mode.as_str();
-        if mode == "blank" {
-            vector.push(Button::new_blank());
-            continue;
-        } else if mode == "time" {
-            vector.push(Button::new_time(config.time.use_24_hr));
-            continue;
-        }
-     
-        match KEY_MAP.get(key) {
-            Some(value) => {
-                match mode  {
-                    "icon" => vector.push(Button::new_icon(label, *value, theme)),
-                    "text" => vector.push(Button::new_text(label, *value)),
-                    //None => Err(format!("Option {} not found!", mode.unwrap_or(-1)),
-                    _ => println!("Value is something else"),
+        match mode {
+            "blank" => vector.push(Button::new_blank()),
+            "time" => vector.push(Button::new_time(config.time.use_24_hr)),
+            "icon" | "text" => {
+                // handle missing input_linux::Keys
+                let key_map = KEY_MAP.get(key);
+                if key_map == None {
+                    eprintln!("Could not find input_linux::Key {} for button {}. Ignored!", key, label);
+                    continue;
                 }
-                //println!("Found key {}: with value {:?}", label, value );
-            }
-            None => println!("Could not find {key} in the map.")
+                if mode == "icon" {
+                    // if theme is an empty string assign the global theme
+                    let theme = theme.is_empty().then(|| config.ui.icon_theme.as_str()).unwrap_or(theme);
+                    vector.push(Button::new_icon(label, *key_map.unwrap(), theme));
+                } else {vector.push(Button::new_text(label, *key_map.unwrap()))};
+            },
+            _ => eprintln!("Could not find mode {} for button {}!", mode, label),
         }
     }
     vector
