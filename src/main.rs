@@ -511,8 +511,8 @@ struct UiConfig {
     primary_layer: LayerType,
     secondary_layer: LayerType,
     font: String,
-    media_theme: String,
-    app_theme: String,
+    media_icon_theme: String,
+    app_icon_theme: String,
 }
 
 
