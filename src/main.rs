@@ -511,7 +511,8 @@ struct UiConfig {
     primary_layer: LayerType,
     secondary_layer: LayerType,
     font: String,
-    icon_theme: String,
+    media_theme: String,
+    app_theme: String,
 }
 
 
@@ -566,16 +567,21 @@ fn build_layer_vectors(buttons: &Vec<ButtonConfig>, config: &Config) -> Vec<Butt
         match mode {
             "blank" => vector.push(Button::new_blank()),
             "time" => vector.push(Button::new_time(config.time.use_24_hr)),
-            "icon" | "text" => {
+            "app" | "media" | "text" => {
                 // handle missing input_linux::Keys
                 let key_map = KEY_MAP.get(key);
                 if key_map == None {
                     eprintln!("Could not find input_linux::Key {} for button {}. Ignored!", key, label);
                     continue;
                 }
-                if mode == "icon" {
+                if mode == "app" {
                     // if theme is an empty string assign the global theme
-                    let theme = theme.is_empty().then(|| config.ui.icon_theme.as_str()).unwrap_or(theme);
+                    let theme = theme.is_empty().then(|| config.ui.app_theme.as_str()).unwrap_or(theme);
+                    vector.push(Button::new_icon(label, *key_map.unwrap(), theme));
+                }
+                else if mode == "media" {
+                    // if theme is an empty string assign the global theme
+                    let theme = theme.is_empty().then(|| config.ui.media_theme.as_str()).unwrap_or(theme);
                     vector.push(Button::new_icon(label, *key_map.unwrap(), theme));
                 } else {vector.push(Button::new_text(label, *key_map.unwrap()))};
             },
