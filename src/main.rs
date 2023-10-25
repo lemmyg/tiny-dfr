@@ -576,12 +576,12 @@ fn build_layer_vectors(buttons: &Vec<ButtonConfig>, config: &Config) -> Vec<Butt
                 }
                 if mode == "app" {
                     // if theme is an empty string assign the global theme
-                    let theme = theme.is_empty().then(|| config.ui.app_theme.as_str()).unwrap_or(theme);
+                    let theme = theme.is_empty().then(|| config.ui.app_icon_theme.as_str()).unwrap_or(theme);
                     vector.push(Button::new_icon(label, *key_map.unwrap(), theme));
                 }
                 else if mode == "media" {
                     // if theme is an empty string assign the global theme
-                    let theme = theme.is_empty().then(|| config.ui.media_theme.as_str()).unwrap_or(theme);
+                    let theme = theme.is_empty().then(|| config.ui.media_icon_theme.as_str()).unwrap_or(theme);
                     vector.push(Button::new_icon(label, *key_map.unwrap(), theme));
                 } else {vector.push(Button::new_text(label, *key_map.unwrap()))};
             },
