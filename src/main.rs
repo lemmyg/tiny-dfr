@@ -109,8 +109,7 @@ impl Button {
                         image = ButtonImage::Png(image::open(icon_path_png).unwrap());
                 } else {
                     // If the icon is not found in /usr/share/pixmaps, use the icon_name as text
-                        let icon_name_label = &Box::leak(format!("{}", icon_name).into_boxed_str());
-                        image = ButtonImage::Text(icon_name_label.to_string());
+                        image = ButtonImage::Text(icon_name.to_string());
                 }
             }
         };
@@ -643,9 +642,9 @@ fn main() {
     let pitch = fb_info.pitch();
     let cpp = fb_info.bpp() / 8;
 
-    if width < 2170 {
+    if width > 2170 {
         for layer in &mut layers {
-            layer.buttons.remove(0);
+            layer.buttons.insert(0, Button::new_text("esc", Key::Esc));
         }
     }
 
@@ -691,9 +690,9 @@ fn main() {
                     config = new_config;
                     last_modified_time = current_modified_time;
                     layers = initialize_layers(&config);
-                    if width < 2170 {
+                    if width > 2170 {
                         for layer in &mut layers {
-                        layer.buttons.remove(0);
+                        layer.buttons.insert(0, Button::new_text("esc", Key::Esc));
                         }
                     }
                     let refreshed_layer = config.ui.primary_layer as usize;
