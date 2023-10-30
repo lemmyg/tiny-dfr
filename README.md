@@ -1,6 +1,31 @@
 # tiny-dfr
 The most basic dynamic function row daemon possible
 
+# Config setup
+
+/etc/tiny-dfr.conf
+
+## Layouts
+* ui.primary_layer and ui.secondary_layer options:
+    * function: Classic F1-12 buttons layout.
+    * special: Apple classic media buttons layout.
+    * specialExtended: Apps and media buttons layout.
+
+* Default layouts:
+    * layers.primary_layer_buttons: Classic F1-12 buttons layout. Used when 'function' layer is assigned.
+    * layers.secondary_layer_buttons: Apple classic media buttons layout. Used when 'special' layer is assigned.
+    * layers.tertiary_layer_buttons: Apps and media buttons layout. Used when 'specialExtended' layer is assigned.
+    * layers.tertiary2_layer_buttons: Extra apps sub layout. Used when 'specialExtended' layer is assigned.
+    * layers.tertiary3_layer_buttons: Apple media sub layout. Used when 'specialExtended' layer is assigned.
+
+## Icon Themes
+
+ Default search paths: /usr/share/tiny-dfr/icons /usr/share/icons
+
+    * ui.media_icon_theme: icons theme name for buttons with media mode.
+    * ui.app_icon_theme: icons theme name for buttons with app mode.
+    * time.use_24_hr: Enable 24h time format 1 or 0. Default 1.
+
 
 ## Dependencies
 pango, libinput, uinput enabled in kernel config
