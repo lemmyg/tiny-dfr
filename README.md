@@ -13,6 +13,8 @@ ui.primary_layer and ui.secondary_layer options:
 * special: Apple classic media buttons layout.
 * specialExtended: Apps and media buttons layout.
 
+When `fn key` is pressed the `ui.secondary_layer` is activated.
+
 Default:
 
 * layers.primary_layer_buttons: Classic F1-12 buttons layout. Used when 'function' layer is assigned.
